@@ -22,10 +22,8 @@ var (
 )
 
 const (
-	ScreenWidth  = 320
-	ScreenHeight = 240
-	buttonWidth  = 100
-	buttonHeight = 50
+	ScreenWidth  = 640
+	ScreenHeight = 480
 )
 
 func init() {
@@ -86,7 +84,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeight int) {
-	return ScreenWidth * 2, ScreenHeight * 2
+	return ScreenWidth, ScreenHeight
 }
 
 func main() {
