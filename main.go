@@ -6,7 +6,6 @@ package main
 import (
 	"fmt"
 	"image"
-	"image/color"
 	"log"
 	"syscall/js"
 
@@ -22,8 +21,8 @@ var (
 )
 
 const (
-	ScreenWidth  = 640
-	ScreenHeight = 480
+	ScreenWidth  = 960
+	ScreenHeight = 720
 )
 
 func init() {
@@ -97,15 +96,11 @@ func main() {
 
 func newImage(data []byte, w, h int) *image.RGBA {
 	m := image.NewRGBA(image.Rect(0, 0, w, h))
-	for x := 0; x < w; x++ {
-		for y := 0; y < h; y++ {
-			p := y*w + x
-			r := uint8(data[p*4])
-			g := uint8(data[p*4+1])
-			b := uint8(data[p*4+2])
-			a := uint8(data[p*4+2])
-			m.Set(x, y, color.RGBA{r, g, b, a})
-		}
+	for i := 0; i < w*h; i++ {
+		m.Pix[i*4+0] = uint8(data[i*4+0])
+		m.Pix[i*4+1] = uint8(data[i*4+1])
+		m.Pix[i*4+2] = uint8(data[i*4+2])
+		m.Pix[i*4+3] = uint8(data[i*4+3])
 	}
 	return m
 }
