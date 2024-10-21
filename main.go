@@ -4,6 +4,8 @@
 package main
 
 import (
+	"bytes"
+	"embed"
 	"fmt"
 	"image"
 	"log"
@@ -11,6 +13,8 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
+	"github.com/ponyo877/go-wasm-face-play/detector"
+	"github.com/ponyo877/go-wasm-face-play/img"
 )
 
 var (
@@ -18,14 +22,28 @@ var (
 	stream js.Value
 	canvas js.Value
 	ctx    js.Value
+	det    *detector.Detector
+	lm     *ebiten.Image
 )
 
 const (
-	ScreenWidth  = 960
-	ScreenHeight = 720
+	ScreenWidth  = 640
+	ScreenHeight = 480
 )
 
+//go:embed img/*
+var files embed.FS
+
 func init() {
+	img, _, err := image.Decode(bytes.NewReader(img.LaughingMan))
+	if err != nil {
+		log.Fatal(err)
+	}
+	lm = ebiten.NewImageFromImage(img)
+	det = detector.NewDetector()
+	if err := det.UnpackCascades(); err != nil {
+		log.Fatal(err)
+	}
 	doc := js.Global().Get("document")
 	video = doc.Call("createElement", "video")
 	canvas = doc.Call("createElement", "canvas")
@@ -59,7 +77,9 @@ func fetchVideoFrame() []byte {
 }
 
 type Game struct {
-	drawImg *ebiten.Image
+	drawImg     *ebiten.Image
+	faceNum     int
+	cx, cy, rad float64
 }
 
 func newGame() *Game {
@@ -73,13 +93,28 @@ func (g *Game) Update() error {
 		return nil
 	}
 	goBin := fetchVideoFrame()
+	pixels := rgbaToGrayscale(goBin, ScreenWidth, ScreenHeight)
+	// widht, height が逆
+	dets := det.DetectFaces(pixels, ScreenHeight, ScreenWidth)
+	g.faceNum = len(dets)
+	for i := 0; i < g.faceNum; i++ {
+		g.cx, g.cy, g.rad = float64(dets[i][1]), float64(dets[i][0]), float64(dets[i][2])*1.5
+	}
 	g.drawImg = ebiten.NewImageFromImage(newImage(goBin, ScreenWidth, ScreenHeight))
 	return nil
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
 	screen.DrawImage(g.drawImg, nil)
-	ebitenutil.DebugPrint(screen, fmt.Sprintf("%f", ebiten.ActualFPS()))
+	op := &ebiten.DrawImageOptions{}
+	mag := g.rad / float64(lm.Bounds().Dx())
+	op.GeoM.Scale(mag, mag)
+	op.GeoM.Translate(-g.rad/2.0, -g.rad/2.0)
+	op.GeoM.Translate(g.cx, g.cy)
+	screen.DrawImage(lm, op)
+	if g.faceNum > 0 {
+		ebitenutil.DebugPrint(screen, fmt.Sprintf("faceNum: %d\nFPS: %f\nfx: %f, fy: %f", g.faceNum, ebiten.ActualFPS(), g.cx, g.cy))
+	}
 }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeight int) {
@@ -103,4 +138,15 @@ func newImage(data []byte, w, h int) *image.RGBA {
 		m.Pix[i*4+3] = uint8(data[i*4+3])
 	}
 	return m
+}
+
+func rgbaToGrayscale(data []uint8, w, h int) []uint8 {
+	gs := make([]uint8, w*h)
+	for i := 0; i < w*h; i++ {
+		r := float64(data[i*4+0])
+		g := float64(data[i*4+1])
+		b := float64(data[i*4+2])
+		gs[i] = uint8(0.5 + 0.2126*r + 0.7152*g + 0.0722*b)
+	}
+	return gs
 }
