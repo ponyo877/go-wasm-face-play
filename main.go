@@ -4,18 +4,27 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
-	"embed"
+	_ "embed"
 	"fmt"
 	"image"
+	"io"
 	"log"
 	"syscall/js"
 
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/audio"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/ponyo877/go-wasm-face-play/detector"
 	"github.com/ponyo877/go-wasm-face-play/img"
 )
+
+//go:embed laughing_man_bg_black.mpg
+var laughing_man_bg_black_mpg []byte
+
+//go:embed laughing_man_mask.png
+var mask []byte
 
 var (
 	video  js.Value
@@ -30,9 +39,6 @@ const (
 	ScreenWidth  = 640
 	ScreenHeight = 480
 )
-
-//go:embed img/*
-var files embed.FS
 
 func init() {
 	img, _, err := image.Decode(bytes.NewReader(img.LaughingMan))
@@ -77,18 +83,30 @@ func fetchVideoFrame() []byte {
 }
 
 type Game struct {
+	player      *MpegPlayer
+	err         error
 	drawImg     *ebiten.Image
 	faceNum     int
 	cx, cy, rad float64
 }
 
 func newGame() *Game {
+	var in io.ReadSeeker
+	in = bytes.NewReader(laughing_man_bg_black_mpg)
+	player, err := NewMPEGPlayer(bufio.NewReader(in))
+	if err != nil {
+		log.Fatal("aaa", err)
+	}
 	return &Game{
+		player:  player,
 		drawImg: ebiten.NewImage(ScreenWidth, ScreenHeight),
 	}
 }
 
 func (g *Game) Update() error {
+	if g.err != nil {
+		return g.err
+	}
 	if !ctx.Truthy() {
 		return nil
 	}
@@ -105,25 +123,43 @@ func (g *Game) Update() error {
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
+	if g.err != nil {
+		return
+	}
 	screen.DrawImage(g.drawImg, nil)
-	op := &ebiten.DrawImageOptions{}
-	mag := g.rad / float64(lm.Bounds().Dx())
-	op.GeoM.Scale(mag, mag)
-	op.GeoM.Translate(-g.rad/2.0, -g.rad/2.0)
-	op.GeoM.Translate(g.cx, g.cy)
-	screen.DrawImage(lm, op)
+	// op := &ebiten.DrawImageOptions{}
+	// mag := g.rad / float64(lm.Bounds().Dx())
+	// op.GeoM.Scale(mag, mag)
+	// op.GeoM.Translate(-g.rad/2.0, -g.rad/2.0)
+	// op.GeoM.Translate(g.cx, g.cy)
+	// screen.DrawImage(lm, op)
+	if err := g.player.Draw(screen, g.rad, int(g.cx), int(g.cy)); err != nil {
+		g.err = err
+	}
 	if g.faceNum > 0 {
 		ebitenutil.DebugPrint(screen, fmt.Sprintf("faceNum: %d\nFPS: %f\nfx: %f, fy: %f", g.faceNum, ebiten.ActualFPS(), g.cx, g.cy))
 	}
 }
+
+// func (g *Game) Draw(screen *ebiten.Image) {
+// 	if g.err != nil {
+// 		return
+// 	}
+// 	if err := g.player.Draw(screen, 1000, 0, 0); err != nil {
+// 		g.err = err
+// 	}
+// 	ebitenutil.DebugPrint(screen, fmt.Sprintf("FPS: %0.2f", ebiten.ActualFPS()))
+// }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeight int) {
 	return ScreenWidth, ScreenHeight
 }
 
 func main() {
+	_ = audio.NewContext(48000)
 	ebiten.SetWindowSize(ScreenWidth, ScreenHeight)
 	ebiten.SetWindowTitle("Face Play")
+	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 	if err := ebiten.RunGame(newGame()); err != nil {
 		log.Fatal(err)
 	}
