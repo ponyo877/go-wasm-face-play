@@ -1,4 +1,4 @@
-# go-wasm-face-play 🎭
+# go-wasm-face-play 😁
 
 ## 🚀 Overview
 
@@ -7,7 +7,7 @@ https://en.wikipedia.org/wiki/Ghost_in_the_Shell:_Stand_Alone_Complex
 
 ### ✨ [Live Demo](https://laughing-man.pages.dev)
 
-![Demo Preview](moving_laughing_man.mov)
+https://github.com/user-attachments/assets/b0ac24a9-b04a-4fe5-9ef9-cdb6caf5c674
 
 ## 🛠️ Technical Stack
 
