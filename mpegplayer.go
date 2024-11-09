@@ -15,7 +15,6 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
 	"image"
 	"io"
@@ -26,7 +25,6 @@ import (
 	"github.com/gen2brain/mpeg"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/audio"
-	"github.com/ponyo877/go-wasm-face-play/img"
 )
 
 type MpegPlayer struct {
@@ -131,35 +129,8 @@ func (p *MpegPlayer) updateFrame() error {
 	p.m.Lock()
 	defer p.m.Unlock()
 
-	// var pos float64
-	// if p.audioPlayer != nil {
-	// 	pos = p.audioPlayer.Position().Seconds()
-	// } else {
-	// 	if p.refTime != (time.Time{}) {
-	// 		pos = time.Since(p.refTime).Seconds()
-	// 	}
-	// }
-
 	video := p.mpg.Video()
-	// if video.HasEnded() {
-	// 	fmt.Println("video ended")
-	// 	// Reset the video to the beginning and continue playing
-	// 	p.mpg.Video().Rewind()
-	// 	// video.Rewind()
-	// 	if p.audioPlayer != nil {
-	// 		p.audioPlayer.Rewind()
-	// 	}
-	// 	p.refTime = time.Now()
-	// }
-
-	// d := 1 / p.mpg.Framerate()
-	var mpegFrame *mpeg.Frame
-	mpegFrame = video.Decode()
-	// for video.Time()+d <= pos && !video.HasEnded() {
-	// 	fmt.Println("video not ended")
-	// 	mpegFrame = video.Decode()
-	// }
-
+	mpegFrame := video.Decode()
 	if mpegFrame == nil {
 		// video.Rewind()
 		p.mpg.Rewind()
@@ -201,19 +172,12 @@ func (p *MpegPlayer) updateFrame() error {
 }
 
 // Draw draws the current frame onto the given screen.
-func (p *MpegPlayer) Draw(screen *ebiten.Image, rad float64, x, y int) error {
+func (p *MpegPlayer) Draw(screen *ebiten.Image, mask *ebiten.Image, rad float64, x, y int) error {
 	if err := p.updateFrame(); err != nil {
 		return err
 	}
-
 	frame := p.frameImage
-	mask, _ := loadImage(img.LaughingManMask)
-	// sw, sh := screen.Bounds().Dx(), screen.Bounds().Dy()
-	// bg := ebiten.NewImage(sw, sh)
-	// bg.Fill(color.RGBA{0x00, 0x00, 0xff, 0xff})
-	// screen.DrawImage(bg, nil)
 	drawLaughingMan(screen, frame, mask, rad, x, y)
-
 	return nil
 }
 
@@ -231,7 +195,6 @@ func drawLaughingMan(screen, frame, mask *ebiten.Image, rad float64, x, y int) {
 	op.GeoM.Scale(s, s)
 	offsetX, offsetY := float64(screen.Bounds().Min.X), float64(screen.Bounds().Min.Y)
 	op.GeoM.Translate(offsetX+(float64(sw)-float64(fw)*s)/2, offsetY+(float64(sh)-float64(fh)*s)/2)
-	op.GeoM.Translate(-rad/2.0, -rad/2.0)
 	op.Filter = ebiten.FilterLinear
 	offscreen.DrawImage(frame, op)
 
@@ -239,18 +202,11 @@ func drawLaughingMan(screen, frame, mask *ebiten.Image, rad float64, x, y int) {
 	offscreen.DrawImage(mask, op)
 
 	op = &ebiten.DrawImageOptions{}
-	s = rad / float64(fw)
+	s = rad / float64(sh)
 	op.GeoM.Scale(s, s)
 	op.GeoM.Translate(float64(x), float64(y))
+	op.GeoM.Translate(-rad/1.5, -rad/2.0)
 	screen.DrawImage(offscreen, op)
-}
-
-func loadImage(data []byte) (*ebiten.Image, error) {
-	m, _, err := image.Decode(bytes.NewReader(data))
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode image: %w", err)
-	}
-	return ebiten.NewImageFromImage(m), nil
 }
 
 // Play starts playing the video.
